@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shopping_list_app/widgets/grocery_list.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,12 +32,6 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Home')),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Text('Home Page'),
-      ),
-    );
+    return GroceryList();
   }
 }
