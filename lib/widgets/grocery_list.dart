@@ -16,11 +16,24 @@ class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItems = [];
   late Future<List<GroceryItem>> _loadItems;
   String? _error;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadItems = _loadItem();
+  }
+
+  List<GroceryItem> _getFilteredItems() {
+    if (_searchQuery.isEmpty) {
+      return _groceryItems;
+    }
+    return _groceryItems
+        .where(
+          (item) =>
+              item.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+        )
+        .toList();
   }
 
   Future<List<GroceryItem>> _loadItem() async {
@@ -127,35 +140,72 @@ class _GroceryListState extends State<GroceryList> {
             _groceryItems = snapshot.data!;
           }
 
+          final filteredItems = _getFilteredItems();
+
           if (_groceryItems.isEmpty) {
             return const Center(child: Text('No items added yet.'));
           }
 
-          return ListView.builder(
-            itemCount: _groceryItems.length,
-            itemBuilder: (ctx, index) => Dismissible(
-              key: ValueKey(_groceryItems[index].id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                color: Colors.red,
-                alignment: Alignment.centerRight,
-                padding: EdgeInsets.only(right: 20),
-                child: Icon(Icons.delete, color: Colors.white),
-              ),
-              onDismissed: (direction) {
-                final deletedItem = _groceryItems[index];
-                _removeItem(deletedItem);
-              },
-              child: ListTile(
-                title: Text(_groceryItems[index].name),
-                leading: Container(
-                  width: 24,
-                  height: 24,
-                  color: _groceryItems[index].category.color,
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search items...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: EdgeInsets.all(12),
+                  ),
                 ),
-                trailing: Text(_groceryItems[index].quantity.toString()),
               ),
-            ),
+              if (filteredItems.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'No items match your search.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filteredItems.length,
+                    itemBuilder: (ctx, index) => Dismissible(
+                      key: ValueKey(filteredItems[index].id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: EdgeInsets.only(right: 20),
+                        child: Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (direction) {
+                        final deletedItem = filteredItems[index];
+                        _removeItem(deletedItem);
+                      },
+                      child: ListTile(
+                        title: Text(filteredItems[index].name),
+                        leading: Container(
+                          width: 24,
+                          height: 24,
+                          color: filteredItems[index].category.color,
+                        ),
+                        trailing: Text(
+                          filteredItems[index].quantity.toString(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           );
         },
       ),
