@@ -18,7 +18,7 @@ class NewItem extends StatefulWidget {
 class _NewItemState extends State<NewItem> {
   final _formKey = GlobalKey<FormState>();
   var _enteredName = '';
-  var _enteredQuntity = 1;
+  var _enteredQuantity = 1;
   var _selectedCategory = categories[Categories.vegetables]!;
   var _isSending = false;
 
@@ -37,7 +37,7 @@ class _NewItemState extends State<NewItem> {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'name': _enteredName,
-          'quantity': _enteredQuntity,
+          'quantity': _enteredQuantity,
           'category': _selectedCategory.title,
         }),
       );
@@ -52,7 +52,7 @@ class _NewItemState extends State<NewItem> {
         GroceryItem(
           id: resData['name'],
           name: _enteredName,
-          quantity: _enteredQuntity,
+          quantity: _enteredQuantity,
           category: _selectedCategory,
         ),
       );
@@ -102,7 +102,7 @@ class _NewItemState extends State<NewItem> {
                         label: Text('Quantity'),
                       ),
                       keyboardType: TextInputType.number,
-                      initialValue: _enteredQuntity.toString(),
+                      initialValue: _enteredQuantity.toString(),
                       validator: (value) {
                         if (value == null ||
                             value.isEmpty ||
@@ -113,7 +113,7 @@ class _NewItemState extends State<NewItem> {
                         return null;
                       },
                       onSaved: (value) {
-                        _enteredQuntity = int.parse(value!);
+                        _enteredQuantity = int.parse(value!);
                       },
                     ),
                   ),

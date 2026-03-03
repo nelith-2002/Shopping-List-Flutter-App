@@ -14,48 +14,58 @@ class GroceryList extends StatefulWidget {
 
 class _GroceryListState extends State<GroceryList> {
   List<GroceryItem> _groceryItems = [];
-  var _isLoading = true;
+  late Future<List<GroceryItem>> _loadItems;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadItem();
+    _loadItems = _loadItem();
   }
 
-  void _loadItem() async {
-    final url = Uri.https(
-      'shopping-list-flutter-ap-6e165-default-rtdb.firebaseio.com',
-      'shopping-list.json',
-    );
-    final response = await http.get(url);
-    if (response.statusCode >= 400) {
-      setState(() {
-        _error = 'Failed to fetch data , please try again later!';
-      });
-    }
-    final Map<String, dynamic> listData = json.decode(response.body);
-    final List<GroceryItem> loadedItems = [];
-    for (final item in listData.entries) {
-      final category = categories.entries
-          .firstWhere(
-            (catItem) => catItem.value.title == item.value['category'],
-          )
-          .value;
-      loadedItems.add(
-        GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ),
+  Future<List<GroceryItem>> _loadItem() async {
+    try {
+      final url = Uri.https(
+        'shopping-list-flutter-ap-6e165-default-rtdb.firebaseio.com',
+        'shopping-list.json',
       );
-    }
 
-    setState(() {
-      _groceryItems = loadedItems;
-      _isLoading = false;
-    });
+      final response = await http.get(url);
+      if (response.statusCode >= 400) {
+        throw Exception(
+          'Failed to fetch grocery items. Please try again later.',
+        );
+      }
+
+      if (response.body == 'null') {
+        return [];
+      }
+
+      final Map<String, dynamic> listData = json.decode(response.body);
+      final List<GroceryItem> loadedItems = [];
+      for (final item in listData.entries) {
+        final category = categories.entries
+            .firstWhere(
+              (catItem) => catItem.value.title == item.value['category'],
+            )
+            .value;
+        loadedItems.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
+
+      return loadedItems;
+    } catch (error) {
+      setState(() {
+        _error = 'Something went wrong, please try again later!';
+      });
+      rethrow;
+    }
   }
 
   void _addItem() async {
@@ -72,79 +82,83 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
-  void _removeItem(GroceryItem item) {
+  void _removeItem(GroceryItem item) async {
+    final index = _groceryItems.indexOf(item);
+
     setState(() {
       _groceryItems.remove(item);
     });
+
+    final url = Uri.https(
+      'shopping-list-flutter-ap-6e165-default-rtdb.firebaseio.com',
+      'shopping-list/${item.id}.json',
+    );
+
+    final response = await http.delete(url);
+
+    if (response.statusCode >= 400) {
+      setState(() {
+        _groceryItems.insert(index, item);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget content = ListView.builder(
-      itemCount: _groceryItems.length,
-      itemBuilder: (ctx, index) => Dismissible(
-        key: ValueKey(_groceryItems[index].id),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          color: Colors.red,
-          alignment: Alignment.centerRight,
-          padding: EdgeInsets.only(right: 20),
-          child: Icon(Icons.delete, color: Colors.white),
-        ),
-        onDismissed: (direction) {
-          final deletedItem = _groceryItems[index];
-          _removeItem(deletedItem);
-
-          // ScaffoldMessenger.of(context).showSnackBar(
-          //   SnackBar(
-          //     content: Text('${deletedItem.name} deleted!'),
-          //     action: SnackBarAction(
-
-          //       label: 'Undo',
-          //       onPressed: () {
-          //         setState(() {
-          //           _groceryItems.insert(index, deletedItem);
-          //         });
-          //       },
-          //     ),
-          //   ),
-          // );
-        },
-        child: ListTile(
-          title: Text(_groceryItems[index].name),
-          leading: Container(
-            width: 24,
-            height: 24,
-            color: _groceryItems[index].category.color,
-          ),
-          trailing: Text(_groceryItems[index].quantity.toString()),
-        ),
-      ),
-    );
-
-    if (_isLoading) {
-      content = const Center(child: CircularProgressIndicator());
-    }
-
-    if (!_isLoading && _groceryItems.isEmpty) {
-      content = Center(
-        child: Text(
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-          'No items added yet!',
-        ),
-      );
-    }
-
-    if (_error != null) {
-      content = Center(child: Text(_error!));
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: Text('Your Groceries'),
         actions: [IconButton(onPressed: _addItem, icon: Icon(Icons.add))],
       ),
-      body: content,
+      body: FutureBuilder(
+        future: _loadItems,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text(snapshot.error.toString()));
+          }
+
+          // Populate _groceryItems when data loads
+          if (snapshot.hasData &&
+              _groceryItems.isEmpty &&
+              snapshot.data!.isNotEmpty) {
+            _groceryItems = snapshot.data!;
+          }
+
+          if (_groceryItems.isEmpty) {
+            return const Center(child: Text('No items added yet.'));
+          }
+
+          return ListView.builder(
+            itemCount: _groceryItems.length,
+            itemBuilder: (ctx, index) => Dismissible(
+              key: ValueKey(_groceryItems[index].id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                color: Colors.red,
+                alignment: Alignment.centerRight,
+                padding: EdgeInsets.only(right: 20),
+                child: Icon(Icons.delete, color: Colors.white),
+              ),
+              onDismissed: (direction) {
+                final deletedItem = _groceryItems[index];
+                _removeItem(deletedItem);
+              },
+              child: ListTile(
+                title: Text(_groceryItems[index].name),
+                leading: Container(
+                  width: 24,
+                  height: 24,
+                  color: _groceryItems[index].category.color,
+                ),
+                trailing: Text(_groceryItems[index].quantity.toString()),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
